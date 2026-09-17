@@ -6,7 +6,6 @@
 <title>Новая запись</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: #ffffff;
@@ -14,13 +13,7 @@
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
-
-  .container {
-    max-width: 700px;
-    margin: 0 auto;
-    padding: 40px 20px 80px;
-  }
-
+  .container { max-width: 700px; margin: 0 auto; padding: 40px 20px 80px; }
   h1 {
     color: #0b2a5b;
     font-size: 32px;
@@ -28,13 +21,7 @@
     margin-bottom: 8px;
     letter-spacing: -0.02em;
   }
-
-  .subtitle {
-    color: #7fb6d9;
-    font-size: 15px;
-    margin-bottom: 28px;
-  }
-
+  .subtitle { color: #7fb6d9; font-size: 15px; margin-bottom: 28px; }
   textarea {
     width: 100%;
     min-height: 300px;
@@ -54,14 +41,7 @@
     box-shadow: 0 0 0 3px rgba(11, 42, 91, 0.08);
   }
   textarea::placeholder { color: #a9cde4; }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 20px;
-  }
-
+  .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
   button {
     font-family: inherit;
     font-size: 15px;
@@ -72,15 +52,12 @@
     cursor: pointer;
     transition: background 0.18s ease, transform 0.06s ease;
   }
-
   .btn-save { background: #0b2a5b; color: #fff; }
   .btn-save:hover { background: #0f3670; }
   .btn-save:active { transform: scale(0.98); }
   .btn-save:disabled { background: #8fa6c4; cursor: default; }
-
   .btn-cancel { background: #eef6fb; color: #2b6a94; }
   .btn-cancel:hover { background: #e2f0f9; }
-
   .link-row {
     display: none;
     margin-top: 22px;
@@ -93,7 +70,6 @@
     gap: 12px;
   }
   .link-row.show { display: flex; }
-
   .link-row .link-label {
     color: #7fb6d9;
     font-size: 13px;
@@ -102,7 +78,6 @@
     letter-spacing: 0.04em;
     white-space: nowrap;
   }
-
   .link-row a {
     color: #0b2a5b;
     font-size: 14px;
@@ -111,7 +86,6 @@
     flex: 1;
   }
   .link-row a:hover { text-decoration: underline; }
-
   .btn-copy {
     background: #0b2a5b;
     color: #fff;
@@ -121,7 +95,6 @@
     flex-shrink: 0;
   }
   .btn-copy:hover { background: #0f3670; }
-
   .status {
     margin-top: 12px;
     font-size: 14px;
@@ -186,7 +159,8 @@
     return [...arr].map(n => chars[n % chars.length]).join('');
   }
 
-  // Читаем массив заметок
+  // Читаем все заметки. ExtendsClass хранит то, что мы в него положили.
+  // Если это массив — вернём его. Если пусто — пустой массив.
   async function fetchStore() {
     const res = await fetch(API_URL, { cache: 'no-store' });
     if (res.status === 404) return [];
@@ -195,12 +169,16 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // Сохраняем массив обратно
-  async function saveStore(items) {
+  // Добавляем одну заметку через PATCH (JSON Merge Patch).
+  // PATCH не стирает массив, а добавляет в него элемент.
+  async function addNote(note) {
     const res = await fetch(API_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(items)
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/merge-patch+json'
+      },
+      // JSON Merge Patch: добавляем в массив новую запись
+      body: JSON.stringify([note])
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
   }
@@ -216,9 +194,31 @@
 
     try {
       showStatus('Сохраняем…');
-      const items = await fetchStore();
-      items.push({ id, text, created: Date.now() });
-      await saveStore(items);
+
+      // Сначала проверяем, есть ли вообще данные в бине.
+      // Если это первый запуск и бин пустой (не массив) — создаём массив.
+      let items = [];
+      try {
+        items = await fetchStore();
+      } catch (err) {
+        // если бина ещё нет или он пустой — начнём с пустого массива
+        items = [];
+      }
+
+      const newNote = { id, text, created: Date.now() };
+
+      if (items.length === 0) {
+        // Первая запись — кладём весь массив через PUT
+        const res = await fetch(API_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([newNote])
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+      } else {
+        // Последующие — через PATCH, добавляем в конец
+        await addNote(newNote);
+      }
 
       const url = new URL(window.location.href);
       url.search = '';
