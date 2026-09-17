@@ -22,7 +22,7 @@
   }
 
   h1 {
-    color: #0b2a5b;              /* тёмно-синий */
+    color: #0b2a5b;
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 8px;
@@ -30,7 +30,7 @@
   }
 
   .subtitle {
-    color: #7fb6d9;              /* нежно-голубой */
+    color: #7fb6d9;
     font-size: 15px;
     margin-bottom: 28px;
   }
@@ -67,7 +67,7 @@
     font-size: 15px;
     font-weight: 600;
     padding: 12px 26px;
-    border-radius: 10px;         /* квадратные с закруглёнными краями */
+    border-radius: 10px;
     border: none;
     cursor: pointer;
     transition: background 0.18s ease, transform 0.06s ease;
@@ -157,9 +157,10 @@
   </div>
 
 <script>
-  /* ======== НАСТРОЙКА ХРАНИЛИЩА ======== */
-  const API_URL = 'https://api.json.lighttools.net/json/c2bf71c8fe189aea';
-  /* ===================================== */
+  /* ======== НАСТРОЙКА EXTENDSCLASS ======== */
+  const BIN_ID  = 'f3e931f7155a';
+  const API_URL = `https://json.extendsclass.com/bin/${BIN_ID}`;
+  /* ======================================== */
 
   const form       = document.getElementById('noteForm');
   const textarea   = document.getElementById('noteText');
@@ -185,20 +186,21 @@
     return [...arr].map(n => chars[n % chars.length]).join('');
   }
 
-  // Читаем всю «базу» записей (объект { id: {text, created} })
+  // Читаем массив заметок
   async function fetchStore() {
     const res = await fetch(API_URL, { cache: 'no-store' });
+    if (res.status === 404) return [];
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    return (data && typeof data === 'object') ? data : {};
+    return Array.isArray(data) ? data : [];
   }
 
-  // Сохраняем всю «базу» обратно
-  async function saveStore(store) {
+  // Сохраняем массив обратно
+  async function saveStore(items) {
     const res = await fetch(API_URL, {
-      method: 'POST',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(store)
+      body: JSON.stringify(items)
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
   }
@@ -214,9 +216,9 @@
 
     try {
       showStatus('Сохраняем…');
-      const store = await fetchStore();
-      store[id] = { text, created: Date.now() };
-      await saveStore(store);
+      const items = await fetchStore();
+      items.push({ id, text, created: Date.now() });
+      await saveStore(items);
 
       const url = new URL(window.location.href);
       url.search = '';
@@ -268,8 +270,8 @@
     if (!id) return;
 
     try {
-      const store = await fetchStore();
-      const rec = store[id];
+      const items = await fetchStore();
+      const rec = items.find(r => r.id === id);
       if (!rec) { showStatus('Запись не найдена', false); return; }
 
       textarea.value = rec.text;
